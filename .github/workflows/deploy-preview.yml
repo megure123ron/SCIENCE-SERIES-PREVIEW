@@ -36,8 +36,24 @@ jobs:
           GAME_DIR="$(find extracted -type d -name 'SCIENCE-SERIES-web' -print -quit)"
 
           if [ -z "$GAME_DIR" ]; then
+            echo "Searching for nested ZIP..."
+            NESTED_ZIP="$(find extracted -type f -name '*.zip' -print -quit)"
+
+            if [ -z "$NESTED_ZIP" ]; then
+              echo "No nested ZIP found"
+              find extracted -maxdepth 5 -print
+              exit 1
+            fi
+
+            mkdir nested
+            unzip -q "$NESTED_ZIP" -d nested
+
+            GAME_DIR="$(find nested -type d -name 'SCIENCE-SERIES-web' -print -quit)"
+          fi
+
+          if [ -z "$GAME_DIR" ]; then
             echo "SCIENCE-SERIES-web folder not found"
-            find extracted -maxdepth 5 -print
+            find extracted nested -maxdepth 5 -print
             exit 1
           fi
 
