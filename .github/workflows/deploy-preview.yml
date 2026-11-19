@@ -1,5 +1,5 @@
 
-name: Deploy preview to GitHub Pages
+name: Deploy SCIENCE SERIES Preview
 
 on:
   push:
@@ -18,6 +18,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -26,27 +27,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ZIP_FILE="SCIENCE-SERIES-v1.2-web.zip"
+
+          if [ ! -s "$ZIP_FILE" ]; then
+            echo "::error::SCIENCE-SERIES-v1.2-web.zip が見つかりません。"
+            exit 1
+          fi
+
+          echo "ZIP file:"
+          ls -lh "$ZIP_FILE"
+
       - name: Extract and validate game files
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="SCIENCE-SERIES-v1.2-web-fixed.zip"
-
-          test -s "$ZIP_FILE" || {
-            echo "::error::ZIP file is missing or empty."
-            exit 1
-          }
+          ZIP_FILE="SCIENCE-SERIES-v1.2-web.zip"
 
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
-
-          # ZIPの中にさらにZIPがある場合も展開する
-          for nested_zip in $(find extracted -type f -name '*.zip'); do
-            target_dir="${nested_zip%.zip}-contents"
-            mkdir -p "$target_dir"
-            unzip -q "$nested_zip" -d "$target_dir"
-          done
 
           GAME_DIR=""
 
@@ -60,11 +64,13 @@ jobs:
           done < <(find extracted -type d)
 
           if [ -z "$GAME_DIR" ]; then
-            echo "::error::Game HTML files were not found in the ZIP."
-            echo "Extracted file list:"
+            echo "::error::3つのゲームのHTMLファイルが見つかりません。"
+            echo "ZIP内のファイル一覧:"
             find extracted -type f | head -100
             exit 1
           fi
+
+          echo "Game directory: $GAME_DIR"
 
           mkdir _site
 
@@ -81,8 +87,13 @@ jobs:
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="theme-color" content="#101827">
             <title>SCIENCE SERIES</title>
             <style>
+              * {
+                box-sizing: border-box;
+              }
+
               body {
                 margin: 0;
                 min-height: 100vh;
@@ -91,23 +102,48 @@ jobs:
                 background: #101827;
                 color: white;
                 font-family: sans-serif;
+                padding: 24px;
               }
+
               main {
-                width: min(90%, 560px);
+                width: min(100%, 560px);
                 text-align: center;
               }
+
+              h1 {
+                font-size: clamp(30px, 7vw, 46px);
+                letter-spacing: 3px;
+                margin-bottom: 12px;
+              }
+
+              p {
+                color: #aab8ca;
+                margin-bottom: 36px;
+              }
+
               a {
                 display: block;
                 margin: 16px 0;
-                padding: 20px;
+                padding: 22px;
                 border: 1px solid #53647c;
                 border-radius: 14px;
                 color: white;
                 text-decoration: none;
                 background: #1c2a40;
+                font-size: 20px;
+                font-weight: bold;
+                transition: background 0.2s, transform 0.2s;
               }
+
               a:hover {
                 background: #2b405e;
+                transform: translateY(-2px);
+              }
+
+              footer {
+                margin-top: 36px;
+                color: #718198;
+                font-size: 12px;
               }
             </style>
           </head>
@@ -115,15 +151,18 @@ jobs:
             <main>
               <h1>SCIENCE SERIES</h1>
               <p>Choose your science adventure.</p>
+
               <a href="./physica/">PHYSICA</a>
               <a href="./chemica/">CHEMICA</a>
               <a href="./biotica/">BIOTICA</a>
+
+              <footer>SCIENCE SERIES PREVIEW</footer>
             </main>
           </body>
           </html>
           EOF
 
-          echo "Files prepared:"
+          echo "Prepared files:"
           find _site -type f | sort
 
           test -s _site/index.html
