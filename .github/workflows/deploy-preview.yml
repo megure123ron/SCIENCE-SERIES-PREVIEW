@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP_FILE="SCIENCE-SERIES-recovered.zip"
+          ZIP_FILE="SCIENCE-SERIES-v1.2-web-fixed.zip"
           test -s "$ZIP_FILE" || {
             echo "::error::ZIP file is missing or empty."
             exit 1
