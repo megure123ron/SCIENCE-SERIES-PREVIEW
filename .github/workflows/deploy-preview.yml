@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
 
           ZIP_FILE="SCIENCE-SERIES-v1.2-web-fixed.zip"
+
           test -s "$ZIP_FILE" || {
             echo "::error::ZIP file is missing or empty."
             exit 1
@@ -39,6 +40,13 @@ jobs:
 
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
+
+          # ZIPの中にさらにZIPがある場合も展開する
+          for nested_zip in $(find extracted -type f -name '*.zip'); do
+            target_dir="${nested_zip%.zip}-contents"
+            mkdir -p "$target_dir"
+            unzip -q "$nested_zip" -d "$target_dir"
+          done
 
           GAME_DIR=""
 
@@ -53,13 +61,13 @@ jobs:
 
           if [ -z "$GAME_DIR" ]; then
             echo "::error::Game HTML files were not found in the ZIP."
-            echo "The ZIP may contain only macOS metadata files."
             echo "Extracted file list:"
             find extracted -type f | head -100
             exit 1
           fi
 
           mkdir _site
+
           cp -R "$GAME_DIR/physica" _site/
           cp -R "$GAME_DIR/chemica" _site/
           cp -R "$GAME_DIR/biotica" _site/
@@ -98,7 +106,9 @@ jobs:
                 text-decoration: none;
                 background: #1c2a40;
               }
-              a:hover { background: #2b405e; }
+              a:hover {
+                background: #2b405e;
+              }
             </style>
           </head>
           <body>
@@ -115,7 +125,11 @@ jobs:
 
           echo "Files prepared:"
           find _site -type f | sort
+
           test -s _site/index.html
+          test -s _site/physica/index.html
+          test -s _site/chemica/index.html
+          test -s _site/biotica/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
