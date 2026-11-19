@@ -1,3 +1,4 @@
+
 name: Deploy preview to GitHub Pages
 
 on:
@@ -20,34 +21,101 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract recovered game ZIP
+      - name: Extract and validate game files
+        shell: bash
         run: |
+          set -euo pipefail
+
           ZIP_FILE="SCIENCE-SERIES-recovered.zip"
-          test -f "$ZIP_FILE" || { echo "ZIP file not found: $ZIP_FILE"; exit 1; }
+          test -s "$ZIP_FILE" || {
+            echo "::error::ZIP file is missing or empty."
+            exit 1
+          }
 
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
 
           GAME_DIR=""
+
           while IFS= read -r dir; do
-            if [ -d "$dir/physica" ] && [ -d "$dir/chemica" ] && [ -d "$dir/biotica" ]; then
+            if [ -s "$dir/physica/index.html" ] &&
+               [ -s "$dir/chemica/index.html" ] &&
+               [ -s "$dir/biotica/index.html" ]; then
               GAME_DIR="$dir"
               break
             fi
           done < <(find extracted -type d)
 
           if [ -z "$GAME_DIR" ]; then
-            echo "Could not find a folder containing all three games."
-            find extracted -maxdepth 6 -print
+            echo "::error::Game HTML files were not found in the ZIP."
+            echo "The ZIP may contain only macOS metadata files."
+            echo "Extracted file list:"
+            find extracted -type f | head -100
             exit 1
           fi
 
           mkdir _site
-          cp -R "$GAME_DIR"/. _site/
+          cp -R "$GAME_DIR/physica" _site/
+          cp -R "$GAME_DIR/chemica" _site/
+          cp -R "$GAME_DIR/biotica" _site/
+
+          find _site -name '._*' -type f -delete
+          find _site -name '__MACOSX' -type d -prune -exec rm -rf {} +
+
+          cat > _site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>SCIENCE SERIES</title>
+            <style>
+              body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                background: #101827;
+                color: white;
+                font-family: sans-serif;
+              }
+              main {
+                width: min(90%, 560px);
+                text-align: center;
+              }
+              a {
+                display: block;
+                margin: 16px 0;
+                padding: 20px;
+                border: 1px solid #53647c;
+                border-radius: 14px;
+                color: white;
+                text-decoration: none;
+                background: #1c2a40;
+              }
+              a:hover { background: #2b405e; }
+            </style>
+          </head>
+          <body>
+            <main>
+              <h1>SCIENCE SERIES</h1>
+              <p>Choose your science adventure.</p>
+              <a href="./physica/">PHYSICA</a>
+              <a href="./chemica/">CHEMICA</a>
+              <a href="./biotica/">BIOTICA</a>
+            </main>
+          </body>
+          </html>
+          EOF
+
+          echo "Files prepared:"
+          find _site -type f | sort
+          test -s _site/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
